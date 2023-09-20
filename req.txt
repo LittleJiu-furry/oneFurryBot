@@ -1,0 +1,8 @@
+websocket-client
+websocket
+websockets
+uvicorn
+fastapi
+requests
+pillow
+uvloop
