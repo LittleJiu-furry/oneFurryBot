@@ -24,13 +24,14 @@ class TypeBind:
 
 # 机器人基础类
 class Bot:
-    def __init__(self,vk:str,botQQ:int,eventBind:TypeBind,baseURL:str):
+    def __init__(self,vk:str,botQQ:int,eventBind:TypeBind,baseURL:str,log):
         self.baseURL = baseURL
         self.vk = vk
         self.botQQ = botQQ
         self.sessionKey = ""
         self.ws_status = False
         self.event = eventBind
+        self.log = log
         self.ws = WebSocket()
         if(platform.system() == "Linux"):
             import uvloop

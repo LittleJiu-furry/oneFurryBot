@@ -13,8 +13,10 @@ bot = Bot(
     vk=botAccount["vk"],
     botQQ=botAccount["account"],
     baseURL=botAccount["baseURL"],
-    eventBind=loader.event
+    eventBind=loader.event,
+    log=log
 )
+
 loader.setFriendMsg(bot.sendFriendMsg)
 loader.setGroupMsg(bot.sendGroupMsg)
 bot.setFatherObject(loader)
@@ -22,3 +24,5 @@ bot.setFatherObject(loader)
 loader.loadByConfig("./config/plugins.json")
 
 bot.connect()
+
+print()

@@ -13,8 +13,8 @@ import asyncio
 import msgtypes
 
 class LoaderMsgBind:
-    _fri_handler = []
-    _gro_handler = []
+    _f_handler = []
+    _g_handler = []
     def Friend_text(self,func,*pat:str):
         for p in pat:
             if('{' in p):
@@ -24,14 +24,14 @@ class LoaderMsgBind:
                 for rei in i:
                     p = p.replace(' {'+rei+'}', '( (?=[^\s])[^\s]*){1}')
                 p = "MSGBIND_^" + p + "$"
-                self._fri_handler.append((p,i,func))
+                self._f_handler.append((p,i,func))
             else:
                 p = "MSGBIND_^" + p + "$"
-                self._fri_handler.append((p,None,func))
+                self._f_handler.append((p,None,func))
             
     async def friend_call(self,_data:msgtypes.FriendMessage):
         pat = await _data.msgChain.getTextMsg()
-        for p,i,func in self._fri_handler:
+        for p,i,func in self._f_handler:
             p = p[8:]
             if(i is not None):
                 # 有参数列表
@@ -72,14 +72,14 @@ class LoaderMsgBind:
                 for rei in i:
                     p = p.replace(' {'+rei+'}', '( (?=[^\s])[^\s]*){1}')
                 p = "MSGBIND_^" + p + "$"
-                self._gro_handler.append((p,i,func))
+                self._g_handler.append((p,i,func))
             else:
                 p = "MSGBIND_^" + p + "$"
-                self._gro_handler.append((p,None,func))
+                self._g_handler.append((p,None,func))
 
     async def group_call(self,_data:msgtypes.GroupMessage):
         pat = await _data.msgChain.getTextMsg()
-        for p,i,func,fatherobj in self._gro_handler:
+        for p,i,func in self._g_handler:
             p = p[8:]
             if(i is not None):
                 # 有参数列表
@@ -123,7 +123,7 @@ class pluginsData:
             self.plugins = _data["plugins"]
 
 class pluginsLoader:
-    _loaderHandlers = []
+    _loaderHandlers = {}
     _registeredPlugins = {}
     _regID = 0
     event = TypeBind()
@@ -135,8 +135,8 @@ class pluginsLoader:
         self.botConfig = botConfig
         self.loadDeal = LoaderMsgBind()
         # loader消息注册
-        # self.loadDeal.Friend_text(self._gdeal,"#")
-        # self.loadDeal.Group_text(self._gdeal,"#")
+        self.loadDeal.Friend_text(self._gdeal,"#loader")
+        self.loadDeal.Group_text(self._gdeal,"#loader")
 
     def load(self,modulePath:str)->int:
         moduleName,_ = os.path.splitext(os.path.basename(modulePath))
@@ -150,8 +150,8 @@ class pluginsLoader:
             self._registeredPlugins.update({moduleName:_plugin})
             self._regID += 1
             # 初始化模块，执行模块中的init方法，拿到模块内部的函数注册器
-            _pluginsHandler = _plugin["plugins"].init(self.friendMsg,self.groupMsg)
-            self._loaderHandlers.append({"friend":_pluginsHandler[0],"group":_pluginsHandler[1]})
+            _pluginsHandler = _plugin["plugins"].init(self.sendFriendMsg,self.sendGroupMsg)
+            self._loaderHandlers[f"MODULE_{_plugin['pluginsID']}"] = _pluginsHandler
             self.log.log(1,f"Loaded Plugins: {moduleName} at {modulePath}")
             return _plugin["pluginsID"]
         except:
@@ -167,6 +167,7 @@ class pluginsLoader:
                 for plugin in pluginsList:
                     try:
                         self.load(_plugins[plugin]["pluginsPath"])
+                        self._registeredPlugins[plugin]["version"] = _plugins[plugin]["version"]
                     except:
                         self.log.log(2,f"Failed to load Plugins: {plugin}")
         except FileNotFoundError:
@@ -179,7 +180,8 @@ class pluginsLoader:
         msg = GroupMessage(_data)
         # loader先处理
         try:
-            self.loadDeal.group_call(msg)
+            await self.loadDeal.group_call(msg)
+            self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.fromGroup_name}][{msg.fromQQ_name}]->{await msg.msgChain.getTextMsg()}')
         except:
             self.log.log(2,"loader cannot deal msg")
             self.log.log(3,f"Loader catched traceback:\n{traceback.format_exc()}")
@@ -187,7 +189,7 @@ class pluginsLoader:
         for plugin in self._registeredPlugins:
             try:
                 pluginsIndex = self._registeredPlugins[plugin]["pluginsID"]
-                await self._loaderHandlers[pluginsIndex]["group"](msg)
+                await self._loaderHandlers[f"MODULE_{pluginsIndex}"].group_call(msg,plugin)
             except:
                 self.log.log(2,f"Loader cannot send msg to {plugin}")
                 self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
@@ -199,6 +201,7 @@ class pluginsLoader:
         # loader先处理
         try:
             await self.loadDeal.friend_call(msg)
+            self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.fromQQ_name}]->{await msg.msgChain.getTextMsg()}')
         except:
             self.log.log(2,"loader cannot deal msg")
             self.log.log(3,f"Loader catched error\n{traceback.format_exc()}")
@@ -206,7 +209,7 @@ class pluginsLoader:
         for plugin in self._registeredPlugins:
             try:
                 pluginsIndex = self._registeredPlugins[plugin]["pluginsID"]
-                await self._loaderHandlers[pluginsIndex]["friend"](msg)
+                await self._loaderHandlers[f"MODULE_{pluginsIndex}"].friend_call(msg,plugin)
             except:
                 self.log.log(2,f"Loader cannot send msg to {plugin}")
                 self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
@@ -219,4 +222,28 @@ class pluginsLoader:
         self.groupMsg = func
 
     async def _gdeal(self,data):
-        pass
+        msg = MsgChain()
+        groupFrom = False
+        if(type(data) == GroupMessage):
+            msg.addAt(data.fromQQ)
+            groupFrom = True
+        msg.addTextMsg("-=OneFurryBot=-")
+        msg.addTextMsg("已加载如下功能插件")
+        if(data.fromQQ == self.botConfig.owner):
+            for plugin in self._registeredPlugins:
+                msg.addTextMsg(f"ID_{self._registeredPlugins[plugin]['pluginsID']}:{plugin}@{self._registeredPlugins[plugin]['version']}")
+
+        msg.addTextMsg("")
+        msg.addTextMsg("-=By LittleJiu=-")
+        if(groupFrom):
+            await self.sendGroupMsg(msg,data.fromGroup)
+        else:
+            await self.sendFriendMsg(msg,data.fromQQ)
+
+    async def sendGroupMsg(self,msg:MsgChain,group:int,msgId:int = None):
+        self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(time.time()))}][send] {await msg.getTextMsg()}')
+        await self.groupMsg(msg,group,msgId)
+        
+    async def sendFriendMsg(self,msg:MsgChain,qq:int,msgId:int = None):
+        self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(time.time()))}][send] {await msg.getTextMsg()}')
+        await self.friendMsg(msg,qq,msgId)
