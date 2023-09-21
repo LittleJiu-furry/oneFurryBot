@@ -19,6 +19,7 @@ bot = Bot(
 
 loader.setFriendMsg(bot.sendFriendMsg)
 loader.setGroupMsg(bot.sendGroupMsg)
+loader.setBot(bot)
 bot.setFatherObject(loader)
 
 loader.loadByConfig("./config/plugins.json")

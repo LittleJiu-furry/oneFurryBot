@@ -49,8 +49,6 @@ class MsgChain:
             "brief": musicInfo.brief
         })
 
-
-        
     async def getTextMsg(self):
         _msg = ""
         for msg in self.msgChain:
@@ -95,8 +93,21 @@ class MsgChain:
         self.msgChain = []
     def deleteLastChain(self):
         self.msgChain.pop()
-
-
+    async def getFullContent(self):
+        _content = ""
+        for msg in self.msgChain:
+            if msg["type"] == "Plain":
+                _content += msg["text"]
+            elif msg["type"] == "At":
+                _m = f'{msg["display"]}({msg["target"]})' if 'display' in msg else msg['target']
+                _content += f"[@{_m}]"
+            elif msg["type"] == "Image":
+                _content += f"[图片]"
+            elif msg["type"] == "Quote":
+                _content += f"[引用]"
+            elif msg["type"] == "Face":
+                _content += f"[Qface:{msg['faceId']},name:{msg['name']}]"
+                
 
 # 好友消息
 class FriendMessage:
