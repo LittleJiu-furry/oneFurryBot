@@ -38,10 +38,11 @@ async def pet(data:sdk.msgtypes.GroupMessage)->bool:
     msg.addTextMsg("")
     msg.addTextMsg("#领养宠物 [名字] 领养一个宠物")
     msg.addTextMsg("#喂养宠物 投喂宠物")
+    msg.addTextMsg("#宠物更名 [名字] #宠物改名 [名字] 为宠物改名")
     msg.addTextMsg("")
     msg.addTextMsg("-=By LittleJiu=-")
     await sendGroupMsg(msg,data.fromGroup)
-    return sdk.sdk.ALLOW_NEXT
+    return sdk.ALLOW_NEXT
 
 # 领养宠物
 @mBind.Group_text("#领养宠物","#领养宠物 {name}")
@@ -181,4 +182,34 @@ async def feedPet(data):
         await sendFriendMsg(msg,data.fromQQ)
     return sdk.ALLOW_NEXT
 
+# 宠物更名
+@mBind.Group_text("#宠物更名 {name}","#宠物改名 {name}","#宠物更名","#宠物改名")
+@mBind.Friend_text("#宠物更名 {name}","#宠物改名 {name}","#宠物更名","#宠物改名")
+async def renamePet(data,name):
+    _petInfo = ex.getPetInfo(data.fromQQ)
+    msg = sdk.msgtypes.MsgChain()
+    groupFrom = False
+    if(type(data) == sdk.msgtypes.GroupMessage):
+        groupFrom = True
+        msg.addAt(data.fromQQ)
+    if(_petInfo != None):
+        if(name != None):
+            _petInfo.name = name
+            ex.writePet(data.fromQQ,_petInfo)
+            _user = ex.getUserSignData(data.fromQQ)
+            if(_user.signValue <= 15):
+                msg.addTextMsg(f"你现在持有的{botConfig.signConfig.signName}已经不足以更名了哦")
+            else:
+                _user.signValue -= 15
+                msg.addTextMsg(f"你的宠物已经改名为[{name}],本次更名消耗15点{botConfig.signConfig.signName}")
+        else:
+            msg.addTextMsg("你的宠物名字叫空格嘛(？？？")
+    else:
+        msg.addTextMsg("你还没有宠物，怎么改名啊(问号脸?")
+    
+    if(groupFrom):
+        await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
+    else:
+        await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
+    return sdk.ALLOW_NEXT
 

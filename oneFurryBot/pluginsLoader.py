@@ -142,14 +142,14 @@ class pluginsLoader:
         self.loadDeal.Group_text(self._reload,"#reload {plugins}")
         self.loadDeal.Friend_text(self._reload,"#reload {plugins}")
 
-    def load(self,modulePath:str,reload:bool = False)->int:
+    def load(self,modulePath:str)->int:
         moduleName,_ = os.path.splitext(os.path.basename(modulePath))
         try:
             _plugin = {
                 "pluginsName":moduleName,
                 "pluginsID":self._regID,
                 "pluginsPath":ex.getPath(modulePath),
-                "plugins":ilb.import_module("." + moduleName,"plugins") if not reload else ilb.reload("." + moduleName,"plugins")
+                "plugins":ilb.import_module("." + moduleName,"plugins")
             }
             self._registeredPlugins.update({moduleName:_plugin})
             self._regID += 1
@@ -269,22 +269,28 @@ class pluginsLoader:
             msg = MsgChain()
             # 查询插件是否加载
             if(plugins in self._registeredPlugins):
+                # 拿到旧的插件对象
+                _old = self._registeredPlugins[plugins]
                 # 删除他原有的在loader中的注册数据
                 self._loaderHandlers.pop(f"MODULE_{self._registeredPlugins[plugins]['pluginsID']}")
                 self._registeredPlugins.pop(plugins)
                 try:
-                    self.load(f"./plugins/{plugins}.py",True)
+                    _old["plugins"] = ilb.reload(_old["plugins"])
+                    self._registeredPlugins[plugins] = _old
+                    _plugins = _old["plugins"].init(self.sendFriendMsg,self.sendGroupMsg)
+                    self._loaderHandlers[f"MODULE_{self._registeredPlugins[plugins]['pluginsID']}"] = _plugins
+                    msg.addTextMsg(f"插件 {plugins} 尝试重载成功")
                 except:
                     self.log.log(2,f"Reload {plugins} failed")
                     self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
                     msg.addTextMsg(f"无法重载插件 {plugins}")
             else:
-                # 插件未加载，
+                # 插件未加载
                 modulePath = f"./plugins/{plugins}.py"
                 if(os.path.exists(modulePath)):
                     # 加载插件
                     try:
-                        self.load(modulePath,True)
+                        self.load(modulePath)
                     except:
                         self.log.log(2,f"Reload {plugins} failed")
                         self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
