@@ -3,6 +3,9 @@
 '''
 import os
 import json
+import datetime
+import time
+from time import struct_time
 
 # =========数据结构定义=========
 
@@ -20,6 +23,7 @@ class userSignDataClass:
             self.lastSignTimestamp = _data["lastSignTimestamp"]
             self.signValue = _data["signValue"]
             self.thisMonth = _data["signDate"]["thisMonth"]
+
 
 class signBotConfig:
     signValueRange = [10,100]
@@ -271,7 +275,16 @@ def writePet(user_id:str,petInfo:PetInfo):
         f.truncate(0)
         f.write(json.dumps(_data,ensure_ascii=False))
         
+# 获得时间差
+def getTimeCut(t1:struct_time,t2:struct_time)->datetime.timedelta:
+    _t1 = datetime.datetime(t1.tm_year,t1.tm_mon,t1.tm_mday,t1.tm_hour,t1.tm_min,t1.tm_sec)
+    _t2 = datetime.datetime(t2.tm_year,t2.tm_mon,t2.tm_mday,t2.tm_hour,t2.tm_min,t2.tm_sec)
+    return (_t1 - _t2)
 
+# 分析@结构
+def analysisAt(msgContent:str)->str:
+    # 格式 [@(user_id)]
+    return msgContent[3:-1]
 
 
 

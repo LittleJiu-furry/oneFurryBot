@@ -36,9 +36,10 @@ async def pet(data:sdk.msgtypes.GroupMessage)->bool:
     msg.addTextMsg("-=OneFurryBot=-")
     msg.addTextMsg("[宠物系统]")
     msg.addTextMsg("")
-    msg.addTextMsg("#领养宠物 [名字] 领养一个宠物")
+    msg.addTextMsg("#领养宠物 <名字> 领养一个宠物")
     msg.addTextMsg("#喂养宠物 投喂宠物")
     msg.addTextMsg("#宠物更名 [名字] #宠物改名 [名字] 为宠物改名")
+    msg.addTextMsg("#宠物信息 获得宠物的信息")
     msg.addTextMsg("")
     msg.addTextMsg("-=By LittleJiu=-")
     await sendGroupMsg(msg,data.fromGroup)
@@ -212,4 +213,59 @@ async def renamePet(data,name):
     else:
         await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
     return sdk.ALLOW_NEXT
+
+# 宠物信息
+@mBind.Group_text("#宠物信息")
+@mBind.Friend_text("#宠物信息")
+async def petInfo(data):
+    msg = sdk.msgtypes.MsgChain()
+    groupFrom = False
+    if(type(data) == sdk.msgtypes.GroupMessage):
+        groupFrom = True
+        msg.addAt(data.fromQQ)
+    
+    _pet = ex.getPetInfo(data.fromQQ)
+    if(_pet != None):
+        msg.addTextMsg(f"-=OneFurryBot=-")
+        msg.addTextMsg(f"[{_pet.name}]的信息如下:")
+        msg.addTextMsg(f"当前等级: {_pet.level}")
+        msg.addTextMsg(f"当前经验值: {_pet.exp}")
+        msg.addTextMsg(f"物种: {_pet.family}")
+        msg.addTextMsg(f"好感等级: {_pet.funLevel}")
+        msg.addTextMsg(f"当前好感度: {_pet.funValue}")
+        msg.addTextMsg(f"每日最少花费: {_pet.minNeed}")
+        _last = time.localtime(_pet.lastEatTime)
+        _now = time.localtime(time.time())
+        _cutDays = ex.getTimeCut(_now,_last)
+        if(_cutDays.days == 0):
+            msg.addTextMsg(f"今日已投喂，没有挨饿")
+        elif(_cutDays.days == 1):
+            msg.addTextMsg(f"今天还没有投喂，别忘了哦~")
+        elif(_cutDays.days > 1):
+            msg.addTextMsg(f"已经{_cutDays.days}没有投喂了，Ta快饿坏了(颓废)")
+        
+        msg.addTextMsg("")
+        msg.addTextMsg("-=By LittleJiu=-")
+    else:
+        msg.addTextMsg("你还没有宠物哦，清先领养一个吧~")
+
+    
+    if(groupFrom):
+        await sendGroupMsg(msg,data.fromGroup)
+    else:
+        await sendFriendMsg(msg,data.fromQQ)
+    
+    return sdk.ALLOW_NEXT
+
+@mBind.Group_text("#喵喵喵")
+async def mewoEgg(data:sdk.msgtypes.GroupMessage):
+    msg = sdk.msgtypes.MsgChain()
+    msg.addAt(data.fromQQ)
+    msg.addTextMsg("喵喵喵？")
+    await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
+    await asyncio.sleep(1)
+    msg.clearMsgChain()
+    msg.addTextMsg("被你发现了呢，不过我可不是猫猫哦^o^y")
+    await sendGroupMsg(msg,data.fromGroup)
+
 

@@ -35,7 +35,7 @@ class MsgBind:
         return deco
 
     async def friend_call(self,_data:msgtypes.FriendMessage,fromModule:str):
-        pat = await _data.msgChain.getTextMsg()
+        pat = await _data.msgChain.getFullContent()
         for p,i,func in self._fri_handler:
             if(fromModule in p):
                 p = p.replace(f"MSGBIND_{fromModule}", "")
@@ -87,7 +87,7 @@ class MsgBind:
         return deco
 
     async def group_call(self,_data:msgtypes.GroupMessage,fromModule:str):
-        pat = await _data.msgChain.getTextMsg()
+        pat = await _data.msgChain.getFullContent()
         for p,i,func in self._gro_handler:
             if(fromModule in p):
                 p = p.replace(f"MSGBIND_{fromModule}", "")
