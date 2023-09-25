@@ -107,7 +107,6 @@ class LoaderMsgBind:
                         kwargs[args] = None
                     if(await func(_data,**kwargs) == False):
                         return
-                    
             await asyncio.sleep(0)
 
 class pluginsData:
@@ -188,8 +187,8 @@ class pluginsLoader:
         msg = GroupMessage(_data)
         # loader先处理
         try:
+            self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.fromGroup_name}][{msg.fromQQ_name}]->{await msg.msgChain.getFullContent()}')
             await self.loadDeal.group_call(msg)
-            self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.fromGroup_name}][{msg.fromQQ_name}]->{await msg.msgChain.getTextMsg()}')
         except:
             self.log.log(2,"loader cannot deal msg")
             self.log.log(3,f"Loader catched traceback:\n{traceback.format_exc()}")
@@ -208,8 +207,8 @@ class pluginsLoader:
         msg = FriendMessage(_data)
         # loader先处理
         try:
+            self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.nickName}]->{await msg.msgChain.getFullContent()}')
             await self.loadDeal.friend_call(msg)
-            self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.fromQQ_name}]->{await msg.msgChain.getTextMsg()}')
         except:
             self.log.log(2,"loader cannot deal msg")
             self.log.log(3,f"Loader catched error\n{traceback.format_exc()}")
@@ -265,45 +264,59 @@ class pluginsLoader:
     # 重载指定插件
     async def _reload(self,data,plugins):
         if(data.fromQQ == self.botConfig.owner):
-            # 来源于主人
+            # 判断是否来源于主人
             msg = MsgChain()
-            # 查询插件是否加载
-            if(plugins in self._registeredPlugins):
-                # 拿到旧的插件对象
-                _old = self._registeredPlugins[plugins]
-                # 删除他原有的在loader中的注册数据
-                self._loaderHandlers.pop(f"MODULE_{self._registeredPlugins[plugins]['pluginsID']}")
-                self._registeredPlugins.pop(plugins)
-                try:
-                    _old["plugins"] = ilb.reload(_old["plugins"])
-                    self._registeredPlugins[plugins] = _old
-                    _plugins = _old["plugins"].init(self.sendFriendMsg,self.sendGroupMsg)
-                    self._loaderHandlers[f"MODULE_{self._registeredPlugins[plugins]['pluginsID']}"] = _plugins
-                    msg.addTextMsg(f"插件 {plugins} 尝试重载成功")
-                except:
-                    self.log.log(2,f"Reload {plugins} failed")
-                    self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
-                    msg.addTextMsg(f"无法重载插件 {plugins}")
-            else:
-                # 插件未加载
-                modulePath = f"./plugins/{plugins}.py"
-                if(os.path.exists(modulePath)):
-                    # 加载插件
-                    try:
-                        self.load(modulePath)
-                    except:
-                        self.log.log(2,f"Reload {plugins} failed")
-                        self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
-                        msg.addTextMsg(f"无法重载插件 {plugins}")
-                else:
-                    # 不存在对应插件
-                    msg.addTextMsg(f"无法加载插件 {plugins} ,因为插件目录中不存在这个插件")
-                    self.log.log(2,f"Loader cannot reload plugin {plugins} because no such plugin's file")
-
+            groupFrom = False
             if(type(data) == GroupMessage):
+                groupFrom = True
+                msg.addAt(data.fromQQ)
+            if(plugins is not None):
+                # 测试，仅尝试卸载
+                if(plugins in self._registeredPlugins.keys()):
+                    _plugin = {
+                        "pluginsName":plugins,
+                        "pluginsID":self._registeredPlugins[plugins]['pluginsID'],
+                        "pluginsPath":f"./plugins/{plugins}.py",
+                        "plugins":self._registeredPlugins[plugins]['plugins'],
+                    }
+                    try:
+                        self._loaderHandlers.pop(f"MODULE_{_plugin['pluginsID']}")
+                        self._registeredPlugins.pop(plugins)
+                        self.log.log(1,f"Loader try to uninstalled plugin {plugins} succeed")
+                        # 尝试重新载入
+                        _plugin["plugins"] = ilb.reload(_plugin["plugins"])
+                        _pluginHandler = _plugin["plugins"].init(self.sendFriendMsg,self.sendGroupMsg)
+                        self._loaderHandlers[f"MODULE_{_plugin['pluginsID']}"] = _pluginHandler
+                        self._registeredPlugins[plugins] = _plugin
+                        self.log.log(1,f"Loader try to reload plugin {plugins} succeed")
+                        msg.addTextMsg(f"插件 {plugins} 尝试重载成功")
+                    except:
+                        self.log.log(2,f"Loader cannot try reload plugin {plugins}")
+                        self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
+                        self.log.log(2,f"Loader cannot reinstall plugin {plugins} but this plugin has been uninstalled")
+                else:
+                    # 指定插件尚未加载，则尝试加载
+                    try:
+                        if(os.path.exists(f"./plugins/{plugins}.py")):
+                            self.load(f"./plugins/{plugins}.py")
+                            msg.addTextMsg(f"指定插件尚未被加载，已尝试加载")
+                            self.log.log(1,f"Loader not found plugin {plugins} from loaded plugins but installed this plugin succeed")
+                        else:
+                            # 指定插件文件不存在，无法加载
+                            msg.addTextMsg(f"指定插件尚未被加载，且无法尝试加载，请检查插件文件是否存在")
+                            self.log.log(2,f"Loader cannot found plugin {plugins} from plugins menu, please ensure plugin file can be found in plugins menu './plugins'")
+                    except:
+                        self.log.log(2,f"Loader cannot reload plugin {plugins} because something wrong from load function")
+                        self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
+
+            else:
+                msg.addTextMsg("请给定需要重载的插件名")
+
+            if(groupFrom):
                 await self.sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
-            elif(type(data) == FriendMessage):
+            else:
                 await self.sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
+            
 
     async def sendGroupMsg(self,msg:MsgChain,group:int,msgId:int = None):
         m = (await msg.getTextMsg()).replace("\n","\\n")

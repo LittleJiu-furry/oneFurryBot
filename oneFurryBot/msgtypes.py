@@ -97,16 +97,18 @@ class MsgChain:
         _content = ""
         for msg in self.msgChain:
             if msg["type"] == "Plain":
-                _content += msg["text"]
+                _content += msg["text"].replace("\n","\\n")
             elif msg["type"] == "At":
                 _m = f'{msg["display"]}({msg["target"]})' if 'display' in msg else msg['target']
                 _content += f"[@{_m}]"
             elif msg["type"] == "Image":
-                _content += f"[图片]"
+                _content += f"[QImg,url:{msg['url']}]" if 'url' in msg else "[QImg]"
             elif msg["type"] == "Quote":
-                _content += f"[引用]"
+                _content += f"[QQuote,id:{msg['id']},senderid:{msg['senderId']},group:{msg['groupId'] if 'groupId' in msg else None}]"
             elif msg["type"] == "Face":
                 _content += f"[Qface:{msg['faceId']},name:{msg['name']}]"
+            await asyncio.sleep(0)
+        return _content
                 
 
 # 好友消息

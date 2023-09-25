@@ -10,8 +10,13 @@ ALLOW_NEXT = True
 DISALLOW_NEXT = False
 
 class MsgBind:
-    _fri_handler = []
-    _gro_handler = []
+    _fri_handler:list
+    _gro_handler:list
+
+    def __init__(self):
+        self._fri_handler = []
+        self._gro_handler = []
+
     def Friend_text(self,fromModule:str,*pat:str):
         def deco(func):
             for p in pat:
