@@ -75,7 +75,6 @@ async def getNewPet(data,name:str):
         _pet = ex.createPet(data.fromQQ,name)
         msg.addTextMsg("-=OneFurryBot=-")
         msg.addTextMsg(f"你成功领养了[{_pet.name}]")
-        msg.addTextMsg(f"[{_pet.name}]的物种为：{_pet.family}")
         msg.addTextMsg(f"[{_pet.name}]预计每日最少需要花费{_pet.minNeed}积分投喂")
         msg.addTextMsg(f"请好好爱护Ta哦~")
 
@@ -249,13 +248,15 @@ async def petInfo(data):
             msg.addTextMsg(f"[{_pet.name}]的信息如下:")
             msg.addTextMsg(f"当前等级: {_pet.level}")
             msg.addTextMsg(f"当前经验值: {_pet.exp}")
-            msg.addTextMsg(f"物种: {_pet.family}")
             msg.addTextMsg(f"好感等级: {_pet.funLevel}")
             msg.addTextMsg(f"当前好感度: {_pet.funValue}")
             msg.addTextMsg(f"每日最少花费: {_pet.minNeed}")
-            _last = time.localtime(_pet.lastEatTime)
-            _now = time.localtime(time.time())
-            _cutDays = ex.getTimeCut(_now,_last)
+            if(_pet.lastEatTime != 0):
+                _last = time.localtime(_pet.lastEatTime)
+                _now = time.localtime(time.time())
+                _cutDays = ex.getTimeCut(_now,_last)
+            else:
+                _cutDays = 1
             if(_cutDays.days == 0):
                 msg.addTextMsg(f"今日已投喂，没有挨饿")
             elif(_cutDays.days == 1):
