@@ -185,42 +185,44 @@ class pluginsLoader:
     @event.bind(opType.GroupMsg)
     async def _groupMsg(self,_data:dict):
         msg = GroupMessage(_data)
-        # loader先处理
-        try:
-            self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.fromGroup_name}][{msg.fromQQ_name}]->{await msg.msgChain.getFullContent()}')
-            await self.loadDeal.group_call(msg)
-        except:
-            self.log.log(2,"loader cannot deal msg")
-            self.log.log(3,f"Loader catched traceback:\n{traceback.format_exc()}")
-        # 在这里进行通知下发
-        for plugin in self._registeredPlugins:
+        if(ex.isBlocked(msg.fromQQ) == False):
+            # loader先处理
             try:
-                pluginsIndex = self._registeredPlugins[plugin]["pluginsID"]
-                await self._loaderHandlers[f"MODULE_{pluginsIndex}"].group_call(msg,plugin)
+                self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.fromGroup_name}][{msg.fromQQ_name}]->{await msg.msgChain.getFullContent()}')
+                await self.loadDeal.group_call(msg)
             except:
-                self.log.log(2,f"Loader cannot send msg to {plugin}")
-                self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
-            await asyncio.sleep(0)
+                self.log.log(2,"loader cannot deal msg")
+                self.log.log(3,f"Loader catched traceback:\n{traceback.format_exc()}")
+            # 在这里进行通知下发
+            for plugin in self._registeredPlugins:
+                try:
+                    pluginsIndex = self._registeredPlugins[plugin]["pluginsID"]
+                    await self._loaderHandlers[f"MODULE_{pluginsIndex}"].group_call(msg,plugin)
+                except:
+                    self.log.log(2,f"Loader cannot send msg to {plugin}")
+                    self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
+                await asyncio.sleep(0)
 
     @event.bind(opType.FriendMsg)
     async def _friendMsg(self,_data:dict):
         msg = FriendMessage(_data)
-        # loader先处理
-        try:
-            self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.nickName}]->{await msg.msgChain.getFullContent()}')
-            await self.loadDeal.friend_call(msg)
-        except:
-            self.log.log(2,"loader cannot deal msg")
-            self.log.log(3,f"Loader catched error\n{traceback.format_exc()}")
-        # 在这里进行通知下发
-        for plugin in self._registeredPlugins:
+        if(ex.isBlocked(msg.fromQQ) == False):
+            # loader先处理
             try:
-                pluginsIndex = self._registeredPlugins[plugin]["pluginsID"]
-                await self._loaderHandlers[f"MODULE_{pluginsIndex}"].friend_call(msg,plugin)
+                self.log.log(1,f'[{time.strftime("%H:%M:%S",time.localtime(msg.msgChain.getSource().msgTime))}][{msg.nickName}]->{await msg.msgChain.getFullContent()}')
+                await self.loadDeal.friend_call(msg)
             except:
-                self.log.log(2,f"Loader cannot send msg to {plugin}")
-                self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
-            await asyncio.sleep(0)
+                self.log.log(2,"loader cannot deal msg")
+                self.log.log(3,f"Loader catched error\n{traceback.format_exc()}")
+            # 在这里进行通知下发
+            for plugin in self._registeredPlugins:
+                try:
+                    pluginsIndex = self._registeredPlugins[plugin]["pluginsID"]
+                    await self._loaderHandlers[f"MODULE_{pluginsIndex}"].friend_call(msg,plugin)
+                except:
+                    self.log.log(2,f"Loader cannot send msg to {plugin}")
+                    self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
+                await asyncio.sleep(0)
 
     def setFriendMsg(self,func):
         self.friendMsg = func

@@ -49,6 +49,12 @@ async def signMenu(data):
     msg.addTextMsg("例如 【#补签 1】(没有【】)即可补签当月1号的签到记录")
     msg.addTextMsg("")
     msg.addTextMsg("-=By LittleJiu=-")
+    if(type(data) == sdk.msgtypes.GroupMessage):
+        await sendGroupMsg(msg,data.fromGroup)
+    else:
+        await sendFriendMsg(msg,data.fromQQ)
+    
+    return sdk.ALLOW_NEXT
 
 # 签到功能
 @mBind.Group_text("sign","签到","#哔咔")
@@ -261,5 +267,10 @@ async def getMe(data)->bool:
         # 来自好友
         await sendFriendMsg(msg,data.fromQQ)
     return sdk.ALLOW_NEXT
+
+
+
+
+
 
 

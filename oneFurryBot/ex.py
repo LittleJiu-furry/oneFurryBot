@@ -64,37 +64,31 @@ class PetInfo:
     createTime:int # 创建时间
     level:int # 等级
     exp:int # 经验
-    family:str # 物种
     minNeed:int # 最小需要消耗值
     lastEatTime:int # 最后投喂时间
     funLevel:int # 好感等级
     funValue:int # 好感值
     dead:bool # 是否已死亡
     deadValue:int # 死亡值
+    needBreak:bool # 是否需要休息
+    breakTime:int # 需要休息的时间
+    breakStartTime:int # 休息的开始时间
     def __init__(self,_data:dict == None) -> None:
         if(_data is not None and _data != {}):
             self.name = _data["name"]
             self.createTime = _data["createTime"]
             self.level = _data["level"]
             self.exp = _data["exp"]
-            self.family = _data["family"]
             self.minNeed = _data["minNeed"]
             self.lastEatTime = _data["lastEatTime"]
             self.dead = _data["dead"]
             self.deadValue = _data["deadValue"]
             self.funLevel = _data["funLevel"]
             self.funValue = _data["funValue"]
+            self.needBreak = _data["needBreak"]
+            self.breakTime = _data["breakTime"]
+            self.breakStartTime = _data["breakStartTime"]
 
-# 物种信息
-class petFamilyInfo:
-    family_name:str
-    actions:list
-    says:list
-    def __init__(self,_data:dict == None,familyName:str == None) -> None:
-        if(_data is not None and _data != {}):
-            self.family_name = familyName
-            self.actions = _data["actions"]
-            self.says = _data["says"]
 
 
 
@@ -200,24 +194,6 @@ def randomStr()->str:
     import time
     return md5(str(time.time()).encode()).hexdigest()
 
-# 获得物种的基础信息
-def getPetFamilyInfo(family:str)->petFamilyInfo:
-    with open(getPath("./config/petsFamily.json"),mode="r",encoding="utf-8") as f:
-        _pets = json.load(f)
-        return petFamilyInfo(_pets[family],family)
-
-# 选择一个随机物种
-def randomPetFamily() -> str:
-    with open(getPath("./config/petsFamily.json"),mode="a+",encoding="utf-8") as f:
-        f.seek(0,0)
-        try:
-            _data = json.load(f)
-        except json.JSONDecodeError:
-            _data = {}
-        import random
-        allFamilys = list(_data.keys())
-        return random.choice(allFamilys)
-
 # 创建一个宠物
 def createPet(user_id:str,pet_name:str = None)->PetInfo:
     with open(getPath("./config/pet.json"),mode="a+",encoding="utf-8") as f:
@@ -226,22 +202,23 @@ def createPet(user_id:str,pet_name:str = None)->PetInfo:
             _data = json.load(f)
         except json.JSONDecodeError:
             _data = {}
-        _petFamily = randomPetFamily()
         import random
         _minNeed = random.randint(50,300)
         import time
         _pet = {
-            "name": pet_name if pet_name is not None else f"{_petFamily}{randomStr()[:6]}",
+            "name": pet_name if pet_name is not None else f"宠物{randomStr()[:6]}",
             "createTime": int(time.time()),
-            "level": 1,
+            "level": 0,
             "exp": 0,
-            "family": _petFamily,
             "minNeed": _minNeed,
             "lastEatTime": 0,
-            "funLevel": 1,
+            "funLevel": 0,
             "funValue": 0,
             "dead":False,
-            "deadValue":0
+            "deadValue":0,
+            "needBreak":False,
+            "breakTime":0,
+            "breakStartTime":0
         }
         _data.update({f'U{user_id}': _pet})
         f.seek(0,0)
@@ -262,13 +239,15 @@ def writePet(user_id:str,petInfo:PetInfo):
             "createTime": petInfo.createTime,
             "level": petInfo.level,
             "exp": petInfo.exp,
-            "family": petInfo.family,
             "minNeed": petInfo.minNeed,
             "lastEatTime": petInfo.lastEatTime,
             "funLevel": petInfo.funLevel,
             "funValue": petInfo.funValue,
             "dead":petInfo.dead,
-            "deadValue":petInfo.deadValue
+            "deadValue":petInfo.deadValue,
+            "needBreak":petInfo.needBreak,
+            "breakStartTime":petInfo.breakStartTime,
+            "breakTime":petInfo.breakTime
         }
         _data.update({f'U{user_id}': _pet})
         f.seek(0,0)
@@ -284,14 +263,59 @@ def getTimeCut(t1:struct_time,t2:struct_time)->datetime.timedelta:
 # 分析@结构
 def analysisAt(msgContent:str)->str:
     # 格式 [@(user_id)]
-    return msgContent[3:-1]
+    return msgContent[3:-2]
 
+# 删除宠物
+def deletePet(user_id:str):
+    with open(getPath("./config/pet.json"),mode="a+",encoding="utf-8") as f:
+        f.seek(0,0)
+        try:
+            _old = json.load(f)
+        except json.JSONDecodeError:
+            _old = {}
+        if(f"U{user_id}" in _old.keys()):
+            # 有用户数据
+            _old.pop(f"U{user_id}")
+            f.seek(0,0)
+            f.truncate(0)
+            f.write(json.dumps(_old,ensure_ascii=False))
+            return True
+        else:
+            return False
 
+# 判断当前用户是否已被禁止执行其他命令
+def isBlocked(user:str)->bool:
+    with open(getPath("./config/block.json"),mode="a+",encoding="utf-8") as f:
+        f.seek(0,0)
+        try:
+            _old = json.load(f)
+        except json.JSONDecodeError:
+            _old = {"blockList":[]}
+        _blockList = _old["blockList"]
+        if(f"U{user}" in _blockList):
+            return True
+        else:
+            return False
 
-
-
-
-
+# 修改用户的阻塞状态
+def changeBlocked(user:str,block:bool):
+    with open(getPath("./config/block.json"),mode="a+",encoding="utf-8") as f:
+        f.seek(0,0)
+        try:
+            _old = json.load(f)
+        except json.JSONDecodeError:
+            _old = {"blockList":[]}
+        _blockList = _old["blockList"]
+        if(block):
+            if(f"U{user}" not in _blockList):
+                _blockList.append(f"U{user}")
+        else:
+            if(f"U{user}" in _blockList):
+                _blockList.remove(f"U{user}")
+        _old["blockList"] = _blockList
+        f.seek(0,0)
+        f.truncate(0)
+        f.write(json.dumps(_old,ensure_ascii=False))
 
 
 

@@ -88,33 +88,42 @@ async def ownerMenu(data):
     msg.addTextMsg("")
     msg.addTextMsg("【本模块下所有指令仅主人生效】")
     msg.addTextMsg("-=By LittleJiu=-")
+    if(type(data) == sdk.msgtypes.GroupMessage):
+        await sendGroupMsg(msg,data.fromGroup)
+    else:
+        await sendFriendMsg(msg,data.fromQQ)
     
+    return sdk.ALLOW_NEXT
 
 
-
+import re
 # 主人功能，为所有用户补偿积分
 @mBind.Group_text("#补偿 {user} {num}")
 @mBind.Friend_text("#补偿 {user} {num}")
 async def owner_addSignValue(data,user,num):
-    if('@' in user):
-        user_id = ex.analysisAt(user)
-    else:
-        user_id = user
-    
-    _user = ex.getUserSignData(user_id)
-    _user.signValue += int(num)
-    ex.writeUserData(_user,user_id)
-    msg = sdk.msgtypes.MsgChain()
-    groupFrom = False
-    if(type(data) == sdk.msgtypes.GroupMessage):
-        msg.addAt(data.fromQQ)
-        groupFrom = True
-    
-    msg.addTextMsg(f"已为用户({user_id})补偿{botConfig.signConfig.signName}{num}点")
-    if(groupFrom):
-        await sendGroupMsg(msg,data.fromGroup)
-    else:
-        await sendFriendMsg(msg,data.fromQQ)
+    if(data.fromQQ == botConfig.owner):
+        if('@' in user):
+            if(re.match(r'^\[@\(\d*\)\]$',user) != None):
+                user_id = ex.analysisAt(user)
+            else:
+                return sdk.ALLOW_NEXT
+        else:
+            user_id = user
+        
+        _user = ex.getUserSignData(user_id)
+        _user.signValue += int(num)
+        ex.writeUserData(_user,user_id)
+        msg = sdk.msgtypes.MsgChain()
+        groupFrom = False
+        if(type(data) == sdk.msgtypes.GroupMessage):
+            msg.addAt(data.fromQQ)
+            groupFrom = True
+        
+        msg.addTextMsg(f"已为用户({user_id})补偿{botConfig.signConfig.signName}{num}点")
+        if(groupFrom):
+            await sendGroupMsg(msg,data.fromGroup)
+        else:
+            await sendFriendMsg(msg,data.fromQQ)
     
     return sdk.ALLOW_NEXT
 
