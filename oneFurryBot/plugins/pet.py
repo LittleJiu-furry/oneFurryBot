@@ -256,6 +256,8 @@ async def petInfo(data):
                 _now = time.localtime(time.time())
                 _cutDays = ex.getTimeCut(_now,_last)
             else:
+                import datetime
+                _cutDays = datetime.timedelta()
                 _cutDays.days = 1
             if(_cutDays.days == 0):
                 msg.addTextMsg(f"今日已投喂，没有挨饿")
