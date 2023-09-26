@@ -33,7 +33,21 @@ class MsgBind:
                     self._fri_handler.append((p,None,func))
             return func
         return deco
-
+    
+    def add_Friend_text(self,fromModule:str,func,*pat:str):
+        for p in pat:
+            if('{' in p):
+                # 提取其中的参数
+                i = re.findall(r'\{([^\s]*)\}', p)
+                # 重新构建表达式
+                for rei in i:
+                    p = p.replace(' {'+rei+'}', '( (?=[^\s])[^\s]*){1}')
+                p = f"MSGBIND_{fromModule}^" + p + "$"
+                self._fri_handler.append((p,i,func))
+            else:
+                p = f"MSGBIND_{fromModule}^" + p + "$"
+                self._fri_handler.append((p,None,func))
+            
     async def friend_call(self,_data:msgtypes.FriendMessage,fromModule:str):
         pat = await _data.msgChain.getFullContent()
         for p,i,func in self._fri_handler:
@@ -85,6 +99,20 @@ class MsgBind:
                     self._gro_handler.append((p,None,func))
             return func
         return deco
+    
+    def add_Group_text(self,fromModule:str,func,*pat:str):
+        for p in pat:
+            if('{' in p):
+                # 提取其中的参数
+                i = re.findall(r'\{([^\s]*)\}', p)
+                # 重新构建表达式
+                for rei in i:
+                    p = p.replace(' {'+rei+'}', '( (?=[^\s])[^\s]*){1}')
+                p = f"MSGBIND_{fromModule}^" + p + "$"
+                self._gro_handler.append((p,i,func))
+            else:
+                p = f"MSGBIND_{fromModule}^" + p + "$"
+                self._gro_handler.append((p,None,func))
 
     async def group_call(self,_data:msgtypes.GroupMessage,fromModule:str):
         pat = await _data.msgChain.getFullContent()

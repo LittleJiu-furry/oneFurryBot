@@ -14,6 +14,12 @@ class myBind(sdk.MsgBind):
     def Group_text(self, *pat: str):
         return super().Group_text(self.pluginName,*pat)
 
+    def add_Group_text(self, func, *pat: str):
+        return super().add_Group_text(self.pluginName, func, *pat)
+    
+    def add_Friend_text(self, func, *pat: str):
+        return super().add_Friend_text(self.pluginName, func, *pat)
+
 mBind = myBind()
 botConfig = ex.getRobotConf()
 
@@ -43,6 +49,7 @@ async def pet(data)->bool:
     msg.addTextMsg("#宠物信息 获得宠物的信息")
     msg.addTextMsg("#放生宠物 放生你的宠物")
     msg.addTextMsg("#宠物探险 <步数> 进行探险")
+    msg.addTextMsg("#宠物冷却消除 #时间跳跃剂 消除宠物的疲劳冷却时间")
     msg.addTextMsg("")
     msg.addTextMsg("-=By LittleJiu=-")
     if(type(data) == sdk.msgtypes.GroupMessage):
@@ -253,7 +260,7 @@ async def petInfo(data):
             msg.addTextMsg(f"每日最少花费: {_pet.minNeed}")
             if(_pet.lastEatTime != 0):
                 _last = time.localtime(_pet.lastEatTime)
-                _now = time.localtime(time.time())
+                _now = time.localtime(data.msgChain.getSource().msgTime)
                 _cutDays = ex.getTimeCut(_now,_last)
             else:
                 import datetime
@@ -278,18 +285,6 @@ async def petInfo(data):
     
     return sdk.ALLOW_NEXT
 
-# 交互彩蛋
-@mBind.Group_text("#喵喵喵")
-async def mewoEgg(data:sdk.msgtypes.GroupMessage):
-    msg = sdk.msgtypes.MsgChain()
-    msg.addAt(data.fromQQ)
-    msg.addTextMsg("喵喵喵？")
-    await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
-    await asyncio.sleep(1)
-    msg.clearMsgChain()
-    msg.addTextMsg("被你发现了呢，不过我可不是猫猫哦^o^y")
-    await sendGroupMsg(msg,data.fromGroup)
-
 # 放生宠物
 @mBind.Group_text("#放生宠物")
 @mBind.Friend_text("#放生宠物")
@@ -307,7 +302,6 @@ async def freePet(data):
             msg.addTextMsg("你的宠物被放生了")
         else:
             msg.addTextMsg("你都没有宠物难道要删空气嘛(x_x)")
-        
         if(groupFrom):
             await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
         else:
@@ -315,7 +309,15 @@ async def freePet(data):
     return sdk.ALLOW_NEXT
 
 import random
+import math
 # 宠物探险
+# 0：什么也没有
+# 1：找到了一些东西[增加积分]
+# 2：发生战斗，但是无受伤战胜[增加积分]
+# 3：发生战斗，但是受伤战胜[增加积分，增加疲劳度]
+# 4：发生战斗，战败，但是带走了部分收益并成功逃脱[获得部分收益，增加疲劳度]
+# 5：发生战斗，战败，但是丢弃了所有收益并成功逃脱[增加疲劳度]
+# 6：发生战斗，战败，死亡[宠物死亡]
 @mBind.Group_text("#宠物探险","#宠物探险 {step}")
 @mBind.Friend_text("#宠物探险","#宠物探险 {step}")
 async def explorePet(data,step):
@@ -326,170 +328,217 @@ async def explorePet(data,step):
     if(type(data) == sdk.msgtypes.GroupMessage):
         groupFrom = True
         msg.addAt(data.fromQQ)
-    
-    _pet = ex.getPetInfo(data.fromQQ)
-    _user = ex.getUserSignData(data.fromQQ)
-    try:
-        if(_pet != None):
-            if(_pet.needBreak != True):
-                _step = int(step) if step is not None else 1
-                msg.addTextMsg(f"已设置当前执行步数为 {_step} 步")
-                msg.addTextMsg("(警告：步数过大将可能导致程序崩溃，请谨慎使用)")
-                msg.addTextMsg("计算过程中，其他指令不可用")
-                msg.addTextMsg("正在进行计算...")
-                msg.addTextMsg("-=By LittleJiu=-")
-                ex.changeBlocked(data.fromQQ,True)
-                if(groupFrom):
-                    await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
-                else:
-                    await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
-                msg.clearMsgChain()
-                msg.addTextMsg("-=OneFurryBot=-")
-                msg.addTextMsg("[宠物模块]")
-                groupFrom = False
-                if(type(data) == sdk.msgtypes.GroupMessage):
-                    groupFrom = True
-                    msg.addAt(data.fromQQ)
+        enable = ex.getGroupEnable(data.fromGroup,"pet")
+    else:
+        enable = True
+    if(enable):
+        _pet = ex.getPetInfo(data.fromQQ)
+        _user = ex.getUserSignData(data.fromQQ)
+        try:
+            if(_pet != None):
+                if(_pet.needBreak != True):
+                    _step = int(step) if step is not None else 1
+                    msg.addTextMsg(f"已设置当前执行步数为 {_step} 步")
+                    msg.addTextMsg("(警告：步数过大将可能导致程序崩溃，请谨慎使用)")
+                    msg.addTextMsg("计算过程中，其他指令不可用")
+                    msg.addTextMsg("正在进行计算...")
+                    msg.addTextMsg("-=By LittleJiu=-")
+                    ex.changeBlocked(data.fromQQ,True)
+                    if(groupFrom):
+                        await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
+                    else:
+                        await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
+                    msg.clearMsgChain()
+                    msg.addTextMsg("-=OneFurryBot=-")
+                    msg.addTextMsg("[宠物模块]")
+                    groupFrom = False
+                    if(type(data) == sdk.msgtypes.GroupMessage):
+                        groupFrom = True
+                        msg.addAt(data.fromQQ)
 
-                _runStep = 0
-                _addValue = 0
-                _addBlockValue = 0
-                _addFunValue = 0
-                while _runStep < _step:
-                    _runStep += 1
-                    _chose = random.choice(range(0,6 * 1000 + 1))
-                    _chose = _chose % 6
-                    if(_chose > 3):
-                        # 重新进行选择，如果5次之内这个值小于3，则返回，否则直接输出
-                        for i in range(5):
-                            _chose = random.choice(range(0,6 * 1000 + 1))
-                            _chose = _chose % 6
-                            if(_chose <= 3):
-                                break
-                            await asyncio.sleep(0)
-                    if(_chose <= 3): 
-                        # 如果选到了小于等于3的值，则生成一个包含7个0,1个1,1个2,1个3的列表并对它打乱
-                        _choseList = [0] * 10
-                        _list2ChoseList = list(range(0,10))
-                        _a = random.choice(_list2ChoseList)
-                        _choseList[_a] = 1
-                        _list2ChoseList.remove(_a)
-                        _a = random.choice(_list2ChoseList)
-                        _choseList[_a] = 2
-                        _list2ChoseList.remove(_a)
-                        _a = random.choice(_list2ChoseList)
-                        _choseList[_a] = 3
-                        del _list2ChoseList
-                        del _a
-                        # 再次进行选择
-                        _chose = _choseList[random.choice(range(0,10))]
-                    elif(_chose == 6):
-                        # 抽到死亡事件，再重新抽取5次
-                        for i in range(5):
-                            _chose = random.choice(range(0,6 * 1000 + 1))
-                            _chose = _chose % 6
-                            if(_chose != 6):
-                                break
-                            await asyncio.sleep(0)
-                    if(_chose == 0):
-                        _content = f"[{_runStep}/{_step}] 什么也没有发生"
-                    elif(_chose == 1):
-                        _thisValue = random.randint(5,20)
-                        _addValue += _thisValue
-                        _content = f"[{_runStep}/{_step}] 找到了一些东西[增加{_thisValue}点{botConfig.signConfig.signName}]"
-                    elif(_chose == 2):
-                        _thisValue = random.randint(15,30)
-                        _addValue += _thisValue
-                        _thisFun = random.randint(0,2)
-                        _addFunValue += _thisFun
-                        _content = f"[{_runStep}/{_step}] 发生了战斗，但是对面看起来很弱，你和[{_pet.name}]几下就将其击败了[增加了{_thisValue}点{botConfig.signConfig.signName}][增加了{_thisFun}点好感度]"
-                    elif(_chose == 3):
-                        _thisValue = random.randint(20,50)
-                        _addValue += _thisValue
-                        _thisBreak = random.randint(1,3)
-                        _addBlockValue += _thisBreak
-                        _thisFun = random.randint(1,3)
-                        _addFunValue += _thisFun
-                        _content = f"[{_runStep}/{_step}] 发生了战斗，虽然身上不小心挂彩，但是你和[{_pet.name}]还是成功将其击败[增加了{_thisValue}点{botConfig.signConfig.signName}][增加了{_thisBreak}点疲劳度][增加了{_thisFun}点好感度]"
-                    elif(_chose == 4):
-                        # 0：什么也没有
-                        # 1：找到了一些东西[增加积分]
-                        # 2：发生战斗，但是无受伤战胜[增加积分]
-                        # 3：发生战斗，但是受伤战胜[增加积分，增加疲劳度]
-                        # 4：发生战斗，战败，但是带走了部分收益并成功逃脱[获得部分收益，增加疲劳度]
-                        # 5：发生战斗，战败，但是丢弃了所有收益并成功逃脱[增加疲劳度]
-                        # 6：发生战斗，战败，死亡[宠物死亡]
-                        _thisBreak = random.randint(3,5)
-                        import math
-                        _addValue = math.floor(_addValue * 0.8) + 1
-                        _content = f"[{_runStep}/{_step}] 发生了战斗，你和[{_pet.name}]略显下风，无法战胜，只好逃离[收益削减20%][增加了{_thisBreak}点疲劳度]"
-                        break
-                    elif(_chose == 5):
-                        _thisBreak = random.randint(7,9)
-                        _addBlockValue = _thisBreak
-                        _addValue = 0
-                        _content = f"[{_runStep}/{_step}] 发生了战斗，对手过于强大，你使用了保命道具带着[{_pet.name}]逃走了[丢失全部收益][增加了{_thisBreak}点疲劳度]"
-                        break
-                    elif(_chose == 6):
-                        _addValue = 0
-                        _addBlockValue = 0
-                        _addFunValue = 0
-                        _pet.dead = True
-                        _content = f"[{_runStep}/{_step}] ╥﹏╥... 你的宠物[{_pet.name}]在发生的战斗中为了保护你而死亡[丢失全部收益][宠物死亡]"
-                        break
-                msg.addTextMsg(f"你和[{_pet.name}]探险完毕")
-                _user.signValue += _addValue
-                msg.addTextMsg(f"获得了{_addValue}点{botConfig.signConfig.signName}")
-                _pet.funValue += _addFunValue
-                msg.addTextMsg(f"增加了{_addFunValue}点好感度")
-                _addedFunLevel = 0
-                while _pet.funValue >= (_pet.funLevel + 1) * 100:
-                    _pet.funValue -= ((_pet.funLevel + 1) * 100)
-                    _pet.funLevel += 1
-                    _addedFunLevel += 1
-                
-                if(_addedFunLevel > 0):
-                    msg.addTextMsg(f"好感度等级提升了{_addedFunLevel}级")
-                
-                _pet.needBreak = True
-                _pet.breakStartTime = int(time.time())
-                _pet.breakTime = _addBlockValue * random.choice(range(150,351))
-                msg.addTextMsg(f"本次探险需要休息 {_pet.breakTime}s")
-                msg.addTextMsg(_content)
-                msg.addTextMsg("")
-                msg.addTextMsg("-=By LittleJiu=-")
-                ex.writeUserData(_user,data.fromQQ)
-                ex.writePet(data.fromQQ,_pet)
-                if(groupFrom):
-                    await sendGroupMsg(msg,data.fromGroup)
-                else:
-                    await sendFriendMsg(msg,data.fromQQ)             
-            else:
-                msg.addTextMsg("你的宠物需要休息哦~")
-                _now = time.localtime(time.time())
-                _end = time.localtime(_pet.breakStartTime + _pet.breakTime)
-                _cut = ex.getTimeCut(_end,_now).seconds
-                if(_cut > 0):
-                    msg.addTextMsg(f"剩余休息时间: {_cut}s")
-                else:
-                    # 修正一些值后重新调用自身
-                    _pet.needBreak = False
+                    _runStep = 0
+                    _addValue = 0
+                    _addBlockValue = random.randint(1,3)
+                    _addFunValue = 0
+                    while _runStep < _step:
+                        _runStep += 1
+                        _chose = random.choice(range(0,6 * 1000 + 1))
+                        _chose = _chose % 6
+                        if(_chose > 3):
+                            # 重新进行选择5次
+                            for i in range(5):
+                                _chose = random.choice(range(0,6 * 1000 + 1))
+                                _chose = _chose % 6
+                                if(_chose <= 3):
+                                    break
+                                
+                        if(_chose <= 3): 
+                            # 如果选到了小于等于3的值，则生成一个包含7个0,1个1,1个2,1个3的列表并对它打乱
+                            _choseList = [0] * 10
+                            _list2ChoseList = list(range(0,10))
+                            _a = random.choice(_list2ChoseList)
+                            _choseList[_a] = 1
+                            _list2ChoseList.remove(_a)
+                            _a = random.choice(_list2ChoseList)
+                            _choseList[_a] = 2
+                            _list2ChoseList.remove(_a)
+                            _a = random.choice(_list2ChoseList)
+                            _choseList[_a] = 3
+                            del _list2ChoseList
+                            del _a
+                            # 再次进行选择
+                            _chose = _choseList[random.choice(range(0,10))]
+                        elif(_chose == 6):
+                            # 抽到死亡事件，再重新抽取5次
+                            for i in range(5):
+                                _chose = random.choice(range(0,6 * 1000 + 1))
+                                _chose = _chose % 6
+                                if(_chose != 6):
+                                    break
+                                await asyncio.sleep(0)
+                        if(_chose == 0):
+                            _content = f"[{_runStep}/{_step}] 什么也没有发生"
+                        elif(_chose == 1):
+                            _thisValue = random.randint(5,20)
+                            _addValue += _thisValue
+                            _content = f"[{_runStep}/{_step}] 找到了一些东西[增加{_thisValue}点{botConfig.signConfig.signName}]"
+                        elif(_chose == 2):
+                            _thisValue = random.randint(15,30)
+                            _addValue += _thisValue
+                            _thisFun = random.randint(0,2)
+                            _addFunValue += _thisFun
+                            _content = f"[{_runStep}/{_step}] 发生了战斗，但是对面看起来很弱，你和[{_pet.name}]几下就将其击败了[增加了{_thisValue}点{botConfig.signConfig.signName}][增加了{_thisFun}点好感度]"
+                        elif(_chose == 3):
+                            _thisValue = random.randint(20,50)
+                            _addValue += _thisValue
+                            _thisBreak = random.randint(1,3)
+                            _addBlockValue += _thisBreak
+                            _thisFun = random.randint(1,3)
+                            _addFunValue += _thisFun
+                            _content = f"[{_runStep}/{_step}] 发生了战斗，虽然身上不小心挂彩，但是你和[{_pet.name}]还是成功将其击败[增加了{_thisValue}点{botConfig.signConfig.signName}][增加了{_thisBreak}点疲劳度][增加了{_thisFun}点好感度]"
+                        elif(_chose == 4):
+                            _thisBreak = random.randint(10,20)
+                            _addValue = math.floor(_addValue * 0.8) + 1
+                            _content = f"[{_runStep}/{_step}] 发生了战斗，你和[{_pet.name}]略显下风，无法战胜，只好逃离[收益削减20%][增加了{_thisBreak}点疲劳度]"
+                            break
+                        elif(_chose == 5):
+                            _thisBreak = random.randint(15,30)
+                            _addBlockValue = _thisBreak
+                            _addValue = 0
+                            _content = f"[{_runStep}/{_step}] 发生了战斗，对手过于强大，你使用了保命道具带着[{_pet.name}]逃走了[丢失全部收益][增加了{_thisBreak}点疲劳度]"
+                            break
+                        elif(_chose == 6):
+                            _addValue = 0
+                            _addBlockValue = 0
+                            _addFunValue = 0
+                            _pet.dead = True
+                            _content = f"[{_runStep}/{_step}] ╥﹏╥... 你的宠物[{_pet.name}]在发生的战斗中为了保护你而死亡[丢失全部收益][宠物死亡]"
+                            break
+                    msg.addTextMsg(f"你和[{_pet.name}]探险完毕")
+                    _contentTail = ""
+                    if(_pet.minNeed < 100):
+                        _addValue = math.floor(_addValue * 0.3) + 1
+                        _contentTail = "[低消费宠物仅收益30%]"
+                    _user.signValue += _addValue
+                    msg.addTextMsg(f"获得了{_addValue}点{botConfig.signConfig.signName}{_contentTail}")
+                    _pet.funValue += _addFunValue
+                    msg.addTextMsg(f"增加了{_addFunValue}点好感度")
+                    _addedFunLevel = 0
+                    while _pet.funValue >= (_pet.funLevel + 1) * 100:
+                        _pet.funValue -= ((_pet.funLevel + 1) * 100)
+                        _pet.funLevel += 1
+                        _addedFunLevel += 1
+                    
+                    if(_addedFunLevel > 0):
+                        msg.addTextMsg(f"好感度等级提升了{_addedFunLevel}级")
+                    
+                    _pet.needBreak = True
+                    _pet.breakStartTime = int(time.time())
+                    _pet.breakTime = _addBlockValue * random.choice(range(60,121))
+                    msg.addTextMsg(f"本次探险需要休息 {_pet.breakTime}s")
+                    msg.addTextMsg(_content)
+                    msg.addTextMsg("")
+                    msg.addTextMsg("-=By LittleJiu=-")
+                    ex.writeUserData(_user,data.fromQQ)
                     ex.writePet(data.fromQQ,_pet)
-                    await explorePet(data,step)
+                    if(groupFrom):
+                        await sendGroupMsg(msg,data.fromGroup)
+                    else:
+                        await sendFriendMsg(msg,data.fromQQ)             
+                else:
+                    msg.addTextMsg("你的宠物需要休息哦~")
+                    import datetime
+                    _now = datetime.datetime.now()
+                    _end = datetime.datetime.fromtimestamp(_pet.breakStartTime + _pet.breakTime)
+                    _cut = (_end - _now).seconds
+                    if(_cut > 0 and _end > _now):
+                        msg.addTextMsg(f"剩余休息时间: {_cut}s")
+                    else:
+                        # 修正一些值后重新调用自身
+                        _pet.needBreak = False
+                        ex.writePet(data.fromQQ,_pet)
+                        await explorePet(data,step)
+                    if(groupFrom):
+                        await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
+                    else:
+                        await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
+            else:
+                msg.addTextMsg("没有宠物怎么探险啊(问号脸")
                 if(groupFrom):
                     await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
                 else:
-                    await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
-        else:
-            msg.addTextMsg("没有宠物怎么探险啊(问号脸")
-            if(groupFrom):
-                await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
-            else:
-                await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)  
-    finally:
-        ex.changeBlocked(data.fromQQ,False)
+                    await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)  
+        finally:
+            ex.changeBlocked(data.fromQQ,False)
     return sdk.ALLOW_NEXT
 
-      
+# 冷却时间消除
+@mBind.Group_text("#宠物冷却消除","#时间跳跃剂")
+@mBind.Friend_text("#宠物冷却消除","#时间跳跃剂")
+async def clearCoolDown(data):
+    msg = sdk.msgtypes.MsgChain()
+    groupFrom = False
+    if(type(data) == sdk.msgtypes.GroupMessage):
+        groupFrom = True
+        msg.addAt(data.fromQQ)
+        enable = ex.getGroupEnable(data.fromGroup,"pet")
+    else:
+        enable = True
+    if(enable):
+        _pet = ex.getPetInfo(data.fromQQ)
+        _user = ex.getUserSignData(data.fromQQ)
+        if(_pet != None):
+            if(_pet.needBreak):
+                # 在休息阶段
+                # 对时间进行判断
+                _now = time.localtime(data.msgChain.getSource().msgTime)
+                _end = time.localtime(_pet.breakStartTime + _pet.breakTime)
+                _cut = ex.getTimeCut(_end,_now)
+                if(_cut.seconds <= 0):
+                    # 已经经过了完整的休息时间
+                    msg.addTextMsg("宠物精力很充沛，暂时用不到这个道具哦~")
+                    _pet.needBreak = False
+                    ex.writePet(data.fromQQ,_pet)
+                else:
+                    if(_user.signValue > 0):
+                        _needCut = (_cut.seconds % 400) * random.randint(5,10)
+                        _pet.needBreak = False
+                        _user.signValue -= _needCut
+                        ex.writePet(data.fromQQ,_pet)
+                        ex.writeUserData(_user,data.fromQQ)
+                        msg.addTextMsg("使用了时间跳跃剂，消除了冷却时间")
+                        msg.addTextMsg(f"本次购买消耗{_needCut}点{botConfig.signConfig.signName},剩余{_user.signValue}点{botConfig.signConfig.signName}")
+                    else:
+                        msg.addTextMsg(f"emmm,当前的{botConfig.signConfig.signName}不够了哦")
+            else:
+                msg.addTextMsg("宠物精力很充沛，暂时用不到这个道具哦~")
+        else:
+            msg.addTextMsg("还没有宠物捏，跳不动一点✓")
+        if(groupFrom):
+            await sendGroupMsg(msg,data.fromGroup)
+        else:
+            await sendFriendMsg(msg,data.fromQQ)
+    return sdk.ALLOW_NEXT
+    
 
-        
+      

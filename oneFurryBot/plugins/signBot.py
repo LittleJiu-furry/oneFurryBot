@@ -15,7 +15,17 @@ class myBind(sdk.MsgBind):
     
     def Group_text(self, *pat: str):
         return super().Group_text(self.pluginName,*pat)
-
+    
+    def add_Group_text(self, func, *pat: str):
+        return super().add_Group_text(self.pluginName, func, *pat)
+    
+    def add_Friend_text(self, func, *pat: str):
+        return super().add_Friend_text(self.pluginName, func, *pat)
+    
+    def del_text(self,pat:str,func):
+        _thisValue = (f"MSGBIND_{self.pluginName}^{pat}$",None,func)
+        if(_thisValue in self._gro_handler):
+            self._gro_handler.remove(_thisValue)
 
 mBind = myBind()
 botConfig = ex.getRobotConf()
@@ -183,6 +193,8 @@ import io
 @mBind.Group_text("#我的信息","#me")
 @mBind.Friend_text("#我的信息","#me")
 async def getMe(data)->bool:
+    # 彩蛋事件注册
+    mBind.add_Group_text(deal,"#阿巴阿巴")
     msg = sdk.msgtypes.MsgChain()
     try:
         with open(ex.getPath("./config/sign.json"),mode="r",encoding="utf-8") as f:
@@ -268,8 +280,31 @@ async def getMe(data)->bool:
         await sendFriendMsg(msg,data.fromQQ)
     return sdk.ALLOW_NEXT
 
+async def deal(data:sdk.msgtypes.GroupMessage):
+    msg = sdk.msgtypes.MsgChain()
+    msg.addAt(data.fromQQ)
+    msg.addTextMsg("略显智慧(智慧的脸(确信")
+    mBind.add_Group_text(deal2,"#略显智慧")
+    mBind.del_text("#阿巴阿巴",deal)
+    await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
+    return sdk.ALLOW_NEXT
 
+async def deal2(data:sdk.msgtypes.GroupMessage):
+    msg = sdk.msgtypes.MsgChain()
+    msg.addAt(data.fromQQ)
+    msg.addTextMsg("嗯?但是很屑的是你诶")
+    mBind.add_Group_text(deal3,"#我才不屑")
+    mBind.del_text("#略显智慧",deal2)
+    await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
+    return sdk.ALLOW_NEXT
 
+async def deal3(data:sdk.msgtypes.GroupMessage):
+    msg = sdk.msgtypes.MsgChain()
+    msg.addAt(data.fromQQ)
+    msg.addTextMsg("算了算了，不和你玩了§(*￣▽￣*)§")
+    await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
+    mBind.del_text("#我才不屑",deal3)
+    return sdk.ALLOW_NEXT
 
 
 

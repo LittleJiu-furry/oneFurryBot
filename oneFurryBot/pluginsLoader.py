@@ -185,6 +185,7 @@ class pluginsLoader:
     @event.bind(opType.GroupMsg)
     async def _groupMsg(self,_data:dict):
         msg = GroupMessage(_data)
+        smsg = MsgChain()
         if(ex.isBlocked(msg.fromQQ) == False):
             # loader先处理
             try:
@@ -192,7 +193,9 @@ class pluginsLoader:
                 await self.loadDeal.group_call(msg)
             except:
                 self.log.log(2,"loader cannot deal msg")
-                self.log.log(3,f"Loader catched traceback:\n{traceback.format_exc()}")
+                self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
+                smsg.addTextMsg(f"接收到消息内容为: {await msg.msgChain.getFullContent()}\nloader catched error:\n{traceback.format_exc()}")
+                await self.sendGroupMsg(smsg,msg.fromGroup)
             # 在这里进行通知下发
             for plugin in self._registeredPlugins:
                 try:
@@ -201,11 +204,14 @@ class pluginsLoader:
                 except:
                     self.log.log(2,f"Loader cannot send msg to {plugin}")
                     self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
+                    smsg.addTextMsg(f"接收到消息内容为: {await msg.msgChain.getFullContent()}\nloader catched error:\n{traceback.format_exc()}")
+                    await self.sendGroupMsg(smsg,msg.fromGroup)
                 await asyncio.sleep(0)
 
     @event.bind(opType.FriendMsg)
     async def _friendMsg(self,_data:dict):
         msg = FriendMessage(_data)
+        smsg = MsgChain()
         if(ex.isBlocked(msg.fromQQ) == False):
             # loader先处理
             try:
@@ -214,6 +220,8 @@ class pluginsLoader:
             except:
                 self.log.log(2,"loader cannot deal msg")
                 self.log.log(3,f"Loader catched error\n{traceback.format_exc()}")
+                smsg.addTextMsg(f"接收到消息内容为: {await msg.msgChain.getFullContent()}\nloader catched error:\n{traceback.format_exc()}")
+                await self.sendFriendMsg(smsg,msg.fromQQ)
             # 在这里进行通知下发
             for plugin in self._registeredPlugins:
                 try:
@@ -222,6 +230,8 @@ class pluginsLoader:
                 except:
                     self.log.log(2,f"Loader cannot send msg to {plugin}")
                     self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
+                    smsg.addTextMsg(f"接收到消息内容为: {await msg.msgChain.getFullContent()}\nloader catched error:\n{traceback.format_exc()}")
+                    await self.sendFriendMsg(smsg,msg.fromQQ)
                 await asyncio.sleep(0)
 
     def setFriendMsg(self,func):
@@ -280,6 +290,8 @@ class pluginsLoader:
                         "pluginsID":self._registeredPlugins[plugins]['pluginsID'],
                         "pluginsPath":f"./plugins/{plugins}.py",
                         "plugins":self._registeredPlugins[plugins]['plugins'],
+                        "version":self._registeredPlugins[plugins]['version'],
+                        "dec":self._registeredPlugins[plugins]['dec']
                     }
                     try:
                         self._loaderHandlers.pop(f"MODULE_{_plugin['pluginsID']}")
