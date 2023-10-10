@@ -2,6 +2,7 @@ from . import sdk
 import asyncio
 import ex
 import os
+from . import pluginsEx
 
 class myBind(sdk.MsgBind):
     def __init__(self) -> None:
@@ -358,10 +359,12 @@ async def explorePet(data,step):
 
                     _runStep = 0
                     _addValue = 0
-                    _addBlockValue = random.randint(1,3)
+                    _addBlockValue = 1
                     _addFunValue = 0
+                    _opStep = 0
                     while _runStep < _step:
                         _runStep += 1
+                        random.seed(time.time() * 1000)
                         _chose = random.choice(range(0,6 * 1000 + 1))
                         _chose = _chose % 6
                         if(_chose > 3):
@@ -396,6 +399,7 @@ async def explorePet(data,step):
                                 if(_chose != 6):
                                     break
                                 await asyncio.sleep(0)
+
                         if(_chose == 0):
                             _content = f"[{_runStep}/{_step}] 什么也没有发生"
                         elif(_chose == 1):
@@ -411,19 +415,23 @@ async def explorePet(data,step):
                         elif(_chose == 3):
                             _thisValue = random.randint(20,50)
                             _addValue += _thisValue
-                            _thisBreak = random.randint(1,3)
+                            # 疲劳度增加0.5 ~ 1.5
+                            _thisBreak = pluginsEx.getRound(random.random()) + 0.5
                             _addBlockValue += _thisBreak
                             _thisFun = random.randint(1,3)
                             _addFunValue += _thisFun
                             _content = f"[{_runStep}/{_step}] 发生了战斗，虽然身上不小心挂彩，但是你和[{_pet.name}]还是成功将其击败[增加了{_thisValue}点{botConfig.signConfig.signName}][增加了{_thisBreak}点疲劳度][增加了{_thisFun}点好感度]"
                         elif(_chose == 4):
-                            _thisBreak = random.randint(10,20)
+                            _opStep += 1
+                            _thisBreak = pluginsEx.getRound(random.random()) * 3 + 2
+                            _addBlockValue += _thisBreak
                             _addValue = math.floor(_addValue * 0.8) + 1
-                            _content = f"[{_runStep}/{_step}] 发生了战斗，你和[{_pet.name}]略显下风，无法战胜，只好逃离[收益削减20%][增加了{_thisBreak}点疲劳度]"
-                            break
+                            _content = f"[{_runStep}/{_step}] 发生了战斗，你和[{_pet.name}]略显下风，无法战胜，只好逃离[收益削减20%]{f'[总体收益已削减{_opStep * 20}%]' if _opStep == 4 else ''}[增加了{_thisBreak}点疲劳度]"
+                            if(_opStep == 4):
+                                break
                         elif(_chose == 5):
                             _thisBreak = random.randint(15,30)
-                            _addBlockValue = _thisBreak
+                            _addBlockValue += _thisBreak
                             _addValue = 0
                             _content = f"[{_runStep}/{_step}] 发生了战斗，对手过于强大，你使用了保命道具带着[{_pet.name}]逃走了[丢失全部收益][增加了{_thisBreak}点疲劳度]"
                             break
@@ -434,9 +442,11 @@ async def explorePet(data,step):
                             _pet.dead = True
                             _content = f"[{_runStep}/{_step}] ╥﹏╥... 你的宠物[{_pet.name}]在发生的战斗中为了保护你而死亡[丢失全部收益][宠物死亡]"
                             break
+                    await asyncio.sleep(0)
+                    # while end
                     msg.addTextMsg(f"你和[{_pet.name}]探险完毕")
                     _contentTail = ""
-                    if(_pet.minNeed < 100):
+                    if(_pet.minNeed < 100 and _addValue != 0):
                         _addValue = math.floor(_addValue * 0.3) + 1
                         _contentTail = "[低消费宠物仅收益30%]"
                     _user.signValue += _addValue
@@ -454,7 +464,7 @@ async def explorePet(data,step):
                     
                     _pet.needBreak = True
                     _pet.breakStartTime = int(time.time())
-                    _pet.breakTime = _addBlockValue * random.choice(range(60,121))
+                    _pet.breakTime = math.floor(float(format(_addBlockValue,".1f")) * random.randint(60,120))
                     msg.addTextMsg(f"本次探险需要休息 {_pet.breakTime}s")
                     msg.addTextMsg(_content)
                     msg.addTextMsg("")
@@ -464,7 +474,7 @@ async def explorePet(data,step):
                     if(groupFrom):
                         await sendGroupMsg(msg,data.fromGroup)
                     else:
-                        await sendFriendMsg(msg,data.fromQQ)             
+                        await sendFriendMsg(msg,data.fromQQ)           
                 else:
                     msg.addTextMsg("你的宠物需要休息哦~")
                     import datetime
@@ -487,7 +497,7 @@ async def explorePet(data,step):
                 if(groupFrom):
                     await sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
                 else:
-                    await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)  
+                    await sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
         finally:
             ex.changeBlocked(data.fromQQ,False)
     return sdk.ALLOW_NEXT
@@ -521,7 +531,18 @@ async def clearCoolDown(data):
                     ex.writePet(data.fromQQ,_pet)
                 else:
                     if(_user.signValue > 0):
-                        _needCut = (_cut.seconds % 400) * random.randint(5,10)
+                        _base = 0.5 + pluginsEx.getRound(random.random() * 0.3)
+                        _needCut = 0
+                        if(_cut.seconds <= 1000):
+                            _needCut = _cut.seconds * _base
+                        else:
+                            _temp = _cut.seconds - 1000
+                            while _temp >= 200:
+                                _needCut += 80 * _base
+                                _temp -= 200
+                            if(_temp > 0):
+                                _needCut += int(_temp * _base * 0.5)
+                        _needCut = math.floor(_needCut)
                         _pet.needBreak = False
                         _user.signValue -= _needCut
                         ex.writePet(data.fromQQ,_pet)

@@ -25,5 +25,3 @@ bot.setFatherObject(loader)
 loader.loadByConfig("./config/plugins.json")
 
 bot.connect()
-
-print()

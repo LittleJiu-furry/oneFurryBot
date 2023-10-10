@@ -85,6 +85,7 @@ async def ownerMenu(data):
     msg.addTextMsg(f"#补偿 [user] [num] 为用户补偿{botConfig.signConfig.signName}")
     msg.addTextMsg("#loader_close 关闭Loader(关闭机器人)")
     msg.addTextMsg("#reload [plugin] 重载插件")
+    msg.addTextMsg("#uninstall [plugin] 卸载插件")
     msg.addTextMsg("")
     msg.addTextMsg("【本模块下所有指令仅主人生效】")
     msg.addTextMsg("-=By LittleJiu=-")
@@ -127,6 +128,11 @@ async def owner_addSignValue(data,user,num):
     
     return sdk.ALLOW_NEXT
 
+# 手动错误
+@mBind.Group_text("#raise_error {text}")
+@mBind.Friend_text("#raise_error {text}")
+async def raise_error_by_self(data,text):
+    raise Exception(text if text != None else "Empty error text")
 
 
 

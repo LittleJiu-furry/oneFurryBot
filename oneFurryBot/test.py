@@ -1,7 +1,3 @@
-import datetime
-import time
-
-t = time.time()
-t1 = datetime.datetime.fromtimestamp(t)
-t2 = datetime.datetime.fromtimestamp(t + 15)
-print(t1 - t2)
+from decimal import Decimal
+y = Decimal(1.345).quantize(Decimal("0.01"), rounding="ROUND_HALF_UP")
+print(float(y) + 1.2)

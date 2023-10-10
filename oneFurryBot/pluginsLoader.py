@@ -114,16 +114,21 @@ class pluginsData:
     pluginsID:int
     pluginsPath:str
     plugins:ModuleType
+    version:str
+    dec:str
     def __init__(self,_data:dict = None):
         if(_data is not None and _data != {}):
             self.pluginsName = _data["pluginsName"]
             self.pluginsID = _data["pluginsID"]
             self.pluginsPath = _data["pluginsPath"]
             self.plugins = _data["plugins"]
+            self.version = _data["version"]
+            self.dec = _data["dec"]
 
 class pluginsLoader:
     _loaderHandlers = {}
-    _registeredPlugins = {}
+    _registeredPlugins:dict[str,pluginsData] = {}
+    _uninstalledPlugins:dict[str,pluginsData] = {}
     _regID = 0
     event = TypeBind()
     friendMsg:None
@@ -140,23 +145,38 @@ class pluginsLoader:
         self.loadDeal.Friend_text(self._close,"#loader_close")
         self.loadDeal.Group_text(self._reload,"#reload {plugins}")
         self.loadDeal.Friend_text(self._reload,"#reload {plugins}")
+        self.loadDeal.Group_text(self._uninstall,"#uninstall {plugins}")
+        self.loadDeal.Friend_text(self._uninstall,"#uninstall {plugins}")
 
-    def load(self,modulePath:str)->int:
+    def load(self,modulePath:str)->pluginsData:
         moduleName,_ = os.path.splitext(os.path.basename(modulePath))
         try:
-            _plugin = {
-                "pluginsName":moduleName,
-                "pluginsID":self._regID,
-                "pluginsPath":ex.getPath(modulePath),
-                "plugins":ilb.import_module("." + moduleName,"plugins")
-            }
-            self._registeredPlugins.update({moduleName:_plugin})
-            self._regID += 1
-            # 初始化模块，执行模块中的init方法，拿到模块内部的函数注册器
-            _pluginsHandler = _plugin["plugins"].init(self.sendFriendMsg,self.sendGroupMsg)
-            self._loaderHandlers[f"MODULE_{_plugin['pluginsID']}"] = _pluginsHandler
-            self.log.log(1,f"Loaded Plugins: {moduleName} at {modulePath}")
-            return _plugin["pluginsID"]
+            if(moduleName in self._uninstalledPlugins):
+                _pluginClass = self._uninstalledPlugins[moduleName]
+                _pluginClass.plugins = ilb.reload(_pluginClass.plugins)
+                self._registeredPlugins[moduleName] = _pluginClass
+                _pluginsHandler = _pluginClass.plugins.init(self.sendFriendMsg,self.sendGroupMsg)
+                self._loaderHandlers[f"MODULE_{_pluginClass.pluginsID}"] = _pluginsHandler
+                self._uninstalledPlugins.pop(moduleName)
+                self.log.log(1,f"module reload from uninstalled plugins list succeed")
+                return _pluginClass
+            else:
+                _plugin = {
+                    "pluginsName":moduleName,
+                    "pluginsID":self._regID,
+                    "pluginsPath":ex.getPath(modulePath),
+                    "plugins":ilb.import_module("." + moduleName,"plugins"),
+                    "version":"",
+                    "dec":""
+                }
+                _pluginClass = pluginsData(_plugin)
+                self._registeredPlugins.update({moduleName:_pluginClass})
+                self._regID += 1
+                # 初始化模块，执行模块中的init方法，拿到模块内部的函数注册器
+                _pluginsHandler = _pluginClass.plugins.init(self.sendFriendMsg,self.sendGroupMsg)
+                self._loaderHandlers[f"MODULE_{_pluginClass.pluginsID}"] = _pluginsHandler
+                self.log.log(1,f"Loaded Plugins: {moduleName} at {modulePath}")
+                return _pluginClass
         except:
             self.log.log(2,f"Failed to load Plugins: {moduleName}")
             self.log.log(3,f"Loader catched traceback:\n{traceback.format_exc()}")
@@ -169,9 +189,9 @@ class pluginsLoader:
                 self.log.log(1,f"Got {len(pluginsList)} plugins from plugins config file, try to load them...")
                 for plugin in pluginsList:
                     try:
-                        self.load(_plugins[plugin]["pluginsPath"])
-                        self._registeredPlugins[plugin]["version"] = _plugins[plugin]["version"]
-                        self._registeredPlugins[plugin]["dec"] = _plugins[plugin]["dec"]
+                        _thisPlugin = self.load(_plugins[plugin]["pluginsPath"])
+                        _thisPlugin.version = _plugins[plugin]["version"]
+                        _thisPlugin.dec = _plugins[plugin]["dec"]
                     except:
                         self.log.log(2,f"Failed to load Plugins: {plugin}")
         except FileNotFoundError:
@@ -199,7 +219,7 @@ class pluginsLoader:
             # 在这里进行通知下发
             for plugin in self._registeredPlugins:
                 try:
-                    pluginsIndex = self._registeredPlugins[plugin]["pluginsID"]
+                    pluginsIndex = self._registeredPlugins[plugin].pluginsID
                     await self._loaderHandlers[f"MODULE_{pluginsIndex}"].group_call(msg,plugin)
                 except:
                     self.log.log(2,f"Loader cannot send msg to {plugin}")
@@ -225,7 +245,7 @@ class pluginsLoader:
             # 在这里进行通知下发
             for plugin in self._registeredPlugins:
                 try:
-                    pluginsIndex = self._registeredPlugins[plugin]["pluginsID"]
+                    pluginsIndex = self._registeredPlugins[plugin].pluginsID
                     await self._loaderHandlers[f"MODULE_{pluginsIndex}"].friend_call(msg,plugin)
                 except:
                     self.log.log(2,f"Loader cannot send msg to {plugin}")
@@ -251,7 +271,7 @@ class pluginsLoader:
         msg.addTextMsg("已加载如下功能插件")
         if(data.fromQQ == self.botConfig.owner):
             for plugin in self._registeredPlugins:
-                msg.addTextMsg(f"ID_{self._registeredPlugins[plugin]['pluginsID']}:{plugin}@{self._registeredPlugins[plugin]['version']} {self._registeredPlugins[plugin]['dec']}")
+                msg.addTextMsg(f"ID_{self._registeredPlugins[plugin].pluginsID}:{plugin}@{self._registeredPlugins[plugin].version} {self._registeredPlugins[plugin].dec}")
 
         msg.addTextMsg("")
         msg.addTextMsg("-=By LittleJiu=-")
@@ -285,22 +305,15 @@ class pluginsLoader:
             if(plugins is not None):
                 # 测试，仅尝试卸载
                 if(plugins in self._registeredPlugins.keys()):
-                    _plugin = {
-                        "pluginsName":plugins,
-                        "pluginsID":self._registeredPlugins[plugins]['pluginsID'],
-                        "pluginsPath":f"./plugins/{plugins}.py",
-                        "plugins":self._registeredPlugins[plugins]['plugins'],
-                        "version":self._registeredPlugins[plugins]['version'],
-                        "dec":self._registeredPlugins[plugins]['dec']
-                    }
+                    _plugin = self._registeredPlugins[plugins]
                     try:
-                        self._loaderHandlers.pop(f"MODULE_{_plugin['pluginsID']}")
+                        self._loaderHandlers.pop(f"MODULE_{_plugin.pluginsID}")
                         self._registeredPlugins.pop(plugins)
                         self.log.log(1,f"Loader try to uninstalled plugin {plugins} succeed")
                         # 尝试重新载入
-                        _plugin["plugins"] = ilb.reload(_plugin["plugins"])
-                        _pluginHandler = _plugin["plugins"].init(self.sendFriendMsg,self.sendGroupMsg)
-                        self._loaderHandlers[f"MODULE_{_plugin['pluginsID']}"] = _pluginHandler
+                        _plugin.plugins = ilb.reload(_plugin.plugins)
+                        _pluginHandler = _plugin.plugins.init(self.sendFriendMsg,self.sendGroupMsg)
+                        self._loaderHandlers[f"MODULE_{_plugin.pluginsID}"] = _pluginHandler
                         self._registeredPlugins[plugins] = _plugin
                         self.log.log(1,f"Loader try to reload plugin {plugins} succeed")
                         msg.addTextMsg(f"插件 {plugins} 尝试重载成功")
@@ -311,7 +324,7 @@ class pluginsLoader:
                 else:
                     # 指定插件尚未加载，则尝试加载
                     try:
-                        if(os.path.exists(f"./plugins/{plugins}.py")):
+                        if(os.path.exists(ex.getPath(f"./plugins/{plugins}.py"))):
                             self.load(f"./plugins/{plugins}.py")
                             msg.addTextMsg(f"指定插件尚未被加载，已尝试加载")
                             self.log.log(1,f"Loader not found plugin {plugins} from loaded plugins but installed this plugin succeed")
@@ -330,6 +343,43 @@ class pluginsLoader:
                 await self.sendGroupMsg(msg,data.fromGroup,data.msgChain.getSource().msgId)
             else:
                 await self.sendFriendMsg(msg,data.fromQQ,data.msgChain.getSource().msgId)
+
+    # 卸载指定插件
+    async def _uninstall(self,data,plugins):
+        # 判断是否来源于主人
+        if(data.fromQQ == self.botConfig.owner):
+            msg = MsgChain()
+            groupFrom = False
+            if(type(data) == GroupMessage):
+                groupFrom = True
+                msg.addAt(data.fromQQ)
+
+            try:
+                # 尝试卸载
+                if(plugins is not None):
+                    if(plugins in self._registeredPlugins):
+                        _plugin = self._registeredPlugins[plugins]
+                        self._loaderHandlers.pop(f"MODULE_{_plugin.pluginsID}")
+                        self._registeredPlugins.pop(plugins)
+                        self._uninstalledPlugins.update({plugins:_plugin})
+                        msg.addTextMsg(f"卸载 {plugins} 成功")
+                    else:
+                        if(plugins in self._uninstalledPlugins):
+                            msg.addTextMsg("该插件已经卸载")
+                        else:
+                            msg.addTextMsg("未找到该插件")
+                else:
+                    msg.addTextMsg("请给定需要卸载的插件名")
+            except:
+                self.log.log(2,f"Loader cannot uninstall plugin {plugins}")
+                self.log.log(3,f"Loader catched error:\n{traceback.format_exc()}")
+                msg.addTextMsg("卸载指定插件失败")
+                
+            
+            if(groupFrom):
+                await self.sendGroupMsg(msg,data.fromGroup)
+            else:
+                await self.sendFriendMsg(msg,data.fromQQ)
 
     async def sendGroupMsg(self,msg:MsgChain,group:int,msgId:int = None):
         m = (await msg.getTextMsg()).replace("\n","\\n")
